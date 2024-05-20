@@ -1,5 +1,7 @@
 package com.example.a71p;
 
+import static android.provider.UserDictionary.Words._ID;
+
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -23,8 +25,9 @@ public class LAFDB extends SQLiteOpenHelper {
     public static final String COLUMN_DESC = "desc";
     public static final String COLUMN_DATE = "date";
     public static final String COLUMN_LOCATION = "location";
+    public static final String COLUMN_LATITUDE = "latitude";
+    public static final String COLUMN_LONGITUDE = "longitude";
 
-    // SQL statement to create the table
     private static final String TABLE_CREATE =
             "CREATE TABLE " + TABLE_LAF + " (" +
                     COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -33,7 +36,13 @@ public class LAFDB extends SQLiteOpenHelper {
                     COLUMN_PHONE + " TEXT, " +
                     COLUMN_DESC + " TEXT, " +
                     COLUMN_DATE + " TEXT, " +
-                    COLUMN_LOCATION + " TEXT);";
+                    COLUMN_LOCATION + " TEXT, " +
+                    COLUMN_LATITUDE + " REAL, " +
+                    COLUMN_LONGITUDE + " REAL, " +
+                    COLUMN_STATUS + " TEXT" +
+                    ");";
+
+
 
     public LAFDB(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);

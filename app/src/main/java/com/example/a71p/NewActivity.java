@@ -3,6 +3,7 @@ package com.example.a71p;
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.content.ContentValues;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
@@ -11,6 +12,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -24,9 +26,19 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.libraries.places.api.Places;
+import com.google.android.libraries.places.api.net.PlacesClient;
+import com.google.android.libraries.places.widget.Autocomplete;
+import com.google.android.libraries.places.widget.AutocompleteActivity;
+import com.google.android.libraries.places.widget.model.AutocompleteActivityMode;
+import com.google.android.libraries.places.api.model.Place;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.List;
 
 public class NewActivity extends AppCompatActivity {
 
@@ -41,6 +53,10 @@ public class NewActivity extends AppCompatActivity {
 
     private LocationManager locationManager;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+    private static final int AUTOCOMPLETE_REQUEST_CODE = 2;
+
+    private double selectedLatitude = 0.0;
+    private double selectedLongitude = 0.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +73,9 @@ public class NewActivity extends AppCompatActivity {
         buttonSave = findViewById(R.id.buttonSave);
 
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        Places.initialize(getApplicationContext(), "AIzaSyBpVq0VKrN3odVXiCvZ200i0qBVWkJMytw");
+        PlacesClient placesClient = Places.createClient(this);
 
         editTextDesc.addTextChangedListener(new TextWatcher() {
             @Override
@@ -83,6 +102,16 @@ public class NewActivity extends AppCompatActivity {
             datePickerDialog.show();
         });
 
+        textViewLocation.setOnClickListener(v -> {
+            // Set the fields to specify which types of place data to return after the user has made a selection.
+            List<Place.Field> fields = Arrays.asList(Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG);
+
+            // Start the autocomplete intent.
+            Intent intent = new Autocomplete.IntentBuilder(AutocompleteActivityMode.OVERLAY, fields)
+                    .build(NewActivity.this);
+            startActivityForResult(intent, AUTOCOMPLETE_REQUEST_CODE);
+        });
+
         buttonSave.setOnClickListener(v -> {
             String type = ((RadioButton) findViewById(radioGroupType.getCheckedRadioButtonId())).getText().toString();
             String name = editTextName.getText().toString();
@@ -96,14 +125,13 @@ public class NewActivity extends AppCompatActivity {
                 return;
             }
 
-            saveDataToDatabase(type, name, phone, desc, date, location);
+            saveDataToDatabase(type, name, phone, desc, date, location, selectedLatitude, selectedLongitude);
         });
 
         requestLocationPermission();
-        getCurrentLocation();
     }
 
-    private void saveDataToDatabase(String type, String name, String phone, String desc, String date, String location) {
+    private void saveDataToDatabase(String type, String name, String phone, String desc, String date, String location, double latitude, double longitude) {
         LAFDB dbHelper = new LAFDB(this);
         SQLiteDatabase db = dbHelper.getWritableDatabase();
 
@@ -114,6 +142,8 @@ public class NewActivity extends AppCompatActivity {
         values.put(LAFDB.COLUMN_DESC, desc);
         values.put(LAFDB.COLUMN_DATE, date);
         values.put(LAFDB.COLUMN_LOCATION, location);
+        values.put(LAFDB.COLUMN_LATITUDE, latitude);
+        values.put(LAFDB.COLUMN_LONGITUDE, longitude);
 
         long newRowId = db.insert(LAFDB.TABLE_LAF, null, values);
         if (newRowId != -1) {
@@ -130,34 +160,36 @@ public class NewActivity extends AppCompatActivity {
         }
     }
 
-    private void getCurrentLocation() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListener() {
-                @Override
-                public void onLocationChanged(@NonNull Location location) {
-                    textViewLocation.setText(location.getLatitude() + ", " + location.getLongitude());
-                }
-
-                @Override
-                public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-                @Override
-                public void onProviderEnabled(@NonNull String provider) {}
-
-                @Override
-                public void onProviderDisabled(@NonNull String provider) {}
-            });
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                getCurrentLocation();
+                // Permission granted, you can access location here
             } else {
                 Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show();
             }
         }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == AUTOCOMPLETE_REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                Place place = Autocomplete.getPlaceFromIntent(data);
+                textViewLocation.setText(place.getName());
+                LatLng latLng = place.getLatLng();
+                if (latLng != null) {
+                    selectedLatitude = latLng.latitude;
+                    selectedLongitude = latLng.longitude;
+                }
+            } else if (resultCode == AutocompleteActivity.RESULT_ERROR) {
+                Status status = Autocomplete.getStatusFromIntent(data);
+                Log.i("NewActivity", status.getStatusMessage());
+            } else if (resultCode == RESULT_CANCELED) {
+                // The user canceled the operation.
+            }
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }
